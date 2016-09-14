@@ -2,6 +2,7 @@
 #include "storage.h"
 #include "sampling.h"
 #include <arch/dev/Display.h>
+#include <arch/dev/SDLInputManager.h>
 
 #include <cassert>
 #include <cstdarg>
@@ -241,7 +242,7 @@ namespace Simulator
                     }
                 }
 
-                auto dm = DisplayManager::GetManager();
+                auto dm = SDLInputManager::GetManager();
                 if (dm) dm->OnCycle(m_cycle);
 
                 if (!idle)

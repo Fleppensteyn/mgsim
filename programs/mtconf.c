@@ -42,11 +42,14 @@ size_t mg_cfgrom_devid = (size_t)-1;
 size_t mg_argvrom_devid = (size_t)-1;
 size_t mg_gfxctl_devid = (size_t)-1;
 size_t mg_gfxfb_devid = (size_t)-1;
+size_t mg_joyinput_devids[4];
+char mg_joyinput_devcount = 0;
+
 volatile uint32_t *mg_gfx_ctl;
 void *mg_gfx_fb;
 
 
-// local version of strcmp to avoid 
+// local version of strcmp to avoid
 // a dependency on the stdlib.
 static int
 __strcmp(const unsigned char *s1, const unsigned char *s2)
@@ -60,7 +63,7 @@ __strcmp(const unsigned char *s1, const unsigned char *s2)
 
 
 static
-void detect_lcd(size_t devid, void *addr) 
+void detect_lcd(size_t devid, void *addr)
 {
     uint32_t lcdcfg = *(uint32_t*)addr;
     if (verbose_boot)
@@ -77,7 +80,7 @@ void detect_lcd(size_t devid, void *addr)
     }
     if (mg_lcd_devid == (size_t)-1)
     {
-        mg_lcd_devid = devid; 
+        mg_lcd_devid = devid;
     }
 }
 
@@ -94,8 +97,8 @@ void detect_uart(size_t devid, void *addr)
     }
     if (mg_uart_devid == (size_t)-1)
     {
-        mg_uart_devid = devid; 
-    }    
+        mg_uart_devid = devid;
+    }
 }
 
 static
@@ -120,9 +123,9 @@ void detect_gfx(size_t devid, void *addr)
     {
         mg_gfxfb_devid = fb_devid;
         mg_gfx_fb = fb_addr;
-        mg_gfxctl_devid = devid; 
+        mg_gfxctl_devid = devid;
         mg_gfx_ctl = addr;
-    }    
+    }
 }
 
 static
@@ -139,8 +142,8 @@ void detect_rtc(size_t devid, void *addr)
     }
     if (mg_rtc_devid == (size_t)-1)
     {
-        mg_rtc_devid = devid; 
-    }    
+        mg_rtc_devid = devid;
+    }
 }
 
 static
@@ -160,9 +163,9 @@ void detect_rpc(size_t devid, void *addr)
     }
     if (mg_rpc_devid == (size_t)-1)
     {
-        mg_rpc_devid = devid; 
+        mg_rpc_devid = devid;
         mg_rpc_chanid = 1;
-    }    
+    }
 }
 
 static
@@ -201,8 +204,25 @@ void detect_rom(size_t devid, void *addr)
     }
 }
 
-static struct 
-{ 
+static
+void detect_joyinput(size_t devid, void *addr)
+{
+    if (verbose_boot)
+    {
+        output_string("* joyinput at 0x", 2);
+        output_hex(addr, 2);
+        output_char('.', 2);
+        output_ts(2);
+        output_char('\n', 2);
+    }
+    if (mg_joyinput_devcount < 4)
+    {
+        mg_joyinput_devids[mg_joyinput_devcount++] = devid;
+    }
+}
+
+static struct
+{
     struct mg_device_id id;
     const char *name;
     void (*detect)(size_t, void*);
@@ -214,6 +234,7 @@ static struct
     { { 1, 5, 1 }, "rom", &detect_rom },
     { { 1, 7, 1 }, "uart", &detect_uart },
     { { 1, 8, 1 }, "rpc", &detect_rpc },
+    { { 1, 9, 1 }, "joyinput", &detect_joyinput },
     { { 0, 0, 0 }, 0, 0 }
 };
 
@@ -247,7 +268,7 @@ void sys_conf_init(void)
     confword_t core_pid_id = (confword_t)-1;
     confword_t core_threads_id = (confword_t)-1;
     confword_t core_families_id = (confword_t)-1;
-    
+
     if (verbose_boot)
     {
         output_string("* reading configuration...\n", 2);
@@ -294,7 +315,7 @@ void sys_conf_init(void)
                             core_families_id = j;
                         else if (core_pid_id == (confword_t)-1 && __strcmp(get_symbol(aname), "pid") == 0)
                             core_pid_id = j;
-                    }                    
+                    }
                 }
             }
             break;
@@ -322,7 +343,7 @@ void sys_conf_init(void)
                     cf = p->payload[1 + 2*core_freq_id + 1],
                     ttes = p->payload[1 + 2*core_threads_id + 1],
                     ftes = p->payload[1 + 2*core_families_id + 1];
-                if (mgconf_core_freq != (confword_t)-1 && 
+                if (mgconf_core_freq != (confword_t)-1 &&
                     (cf != mgconf_core_freq || ttes != mgconf_ttes_per_core || ftes != mgconf_ftes_per_core))
                 {
                     output_string("# warning: core ", 2);
@@ -341,7 +362,7 @@ void sys_conf_init(void)
                         output_string("MHz.\n  - ", 2);
                         output_uint(mgconf_ttes_per_core, 2);
                         output_string(" thread and ", 2);
-                        output_uint(mgconf_ftes_per_core, 2);                    
+                        output_uint(mgconf_ftes_per_core, 2);
                         output_string(" family entries per core.\n", 2);
                     }
                 }
@@ -407,7 +428,7 @@ void sys_detect_devs(void)
         output_string(" notification channels.", 2);
         output_ts(2);
         output_char('\n', 2);
-    }    
+    }
 
     mg_io_dca_devid = (io_params >> 24) & 0xff;
 
@@ -526,7 +547,7 @@ void sys_detect_devs(void)
                     output_uint(devenum[i].revision, 2);
                     output_string(" at 0x", 2);
                     output_hex(addrs[i], 2);
-                    output_char('.', 2); 
+                    output_char('.', 2);
                     output_ts(2);
                     output_char('\n', 2);
                 }

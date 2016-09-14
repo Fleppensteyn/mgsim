@@ -89,7 +89,11 @@ namespace Simulator
           m_fd_out(-1),
           InitStateVariable(enabled, false),
 
-          InitProcess(p_dummy, DoNothing)
+          InitProcess(p_dummy, DoNothing),
+
+          InitStateVariable(joystick, false),
+          m_joystickqueue(),
+          m_sdljoyindex(-1)
     {
         int ein, eout;
         string fin, fout;
@@ -122,6 +126,36 @@ namespace Simulator
             m_fd_in = STDIN_FILENO;
             m_fd_out = STDOUT_FILENO;
             ein = eout = 0;
+        }
+        else if (connectMode == "JOYSTICK")
+        {
+            fin = GetConf("UARTJoystick", string);
+            fout = "/dev/null";
+            m_fd_in = open(fin.c_str(), O_RDONLY);
+            ein = errno;
+            errno = 0;
+            m_fd_out = open(fout.c_str(), O_WRONLY);
+            eout = errno;
+            m_joystick = true;
+        }
+        else if (connectMode == "SDLJOYSTICK")
+        {
+            m_sdljoyindex = GetConf("UARTSDLJoystick", int);
+            SDLInputManager::CreateManagerIfNotExists(*GetKernel()->GetConfig());
+            if (!SDLInputManager::GetManager()->IsJoystickAvailable(m_sdljoyindex))
+            {
+                throw exceptf<InvalidArgumentException>("No SDL Joystick with index detected: %d", m_sdljoyindex);
+            }
+            char buff[20];
+            snprintf(buff, 20, "SDL Joystick %d", m_sdljoyindex);
+            fin = buff;
+            fout = "/dev/null";
+            ein = 0;
+            errno = 0;
+            m_fd_in = STDIN_FILENO;
+            m_fd_out = open(fout.c_str(), O_WRONLY);
+            eout = errno;
+            m_joystick = true;
         }
 #ifdef get_pty_master
         else if (connectMode == "PTY")
@@ -188,6 +222,9 @@ namespace Simulator
         RegisterModelObject(*this, "uart");
         RegisterModelProperty(*this, "inpfifosz", m_fifo_in.GetMaxSize());
         RegisterModelProperty(*this, "outfifosz", m_fifo_out.GetMaxSize());
+
+        p_ReadInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid));
+        p_Receive.SetStorageTraces(m_fifo_in * opt(m_readInterrupt) * m_receiveEnable);
     }
 
     Result UART::DoSendReadInterrupt()
@@ -303,7 +340,7 @@ namespace Simulator
 
     StorageTraceSet UART::GetReadRequestTraces() const
     {
-        return (opt(opt(m_readInterrupt) * m_fifo_in)
+        return (opt(opt(m_readInterrupt) * m_fifo_in) * opt(m_readInterrupt * opt(m_receiveEnable))
                 ^ opt(m_writeInterrupt)) * m_ioif.GetRequestTraces(m_devid);
     }
 
@@ -402,7 +439,10 @@ namespace Simulator
                 m_writeInterrupt.Clear();
                 m_readInterrupt.Clear();
                 COMMIT {
-                    Selector::GetSelector().UnregisterStream(m_fd_in);
+                    if (m_sdljoyindex > -1)
+                        SDLInputManager::GetManager()->UnregisterJoystickClient(*this);
+                    else
+                        Selector::GetSelector().UnregisterStream(m_fd_in);
                     if (m_fd_in != m_fd_out)
                         Selector::GetSelector().UnregisterStream(m_fd_out);
                     m_enabled = false;
@@ -412,7 +452,10 @@ namespace Simulator
             {
                 DebugIOWrite("Activating the UART");
                 COMMIT {
-                    Selector::GetSelector().RegisterStream(m_fd_in, *this);
+                    if (m_sdljoyindex > -1)
+                        SDLInputManager::GetManager()->RegisterJoystickClient(*this, m_sdljoyindex);
+                    else
+                        Selector::GetSelector().RegisterStream(m_fd_in, *this);
                     if (m_fd_in != m_fd_out)
                         Selector::GetSelector().RegisterStream(m_fd_out, *this);
                     m_enabled = true;
@@ -459,6 +502,20 @@ namespace Simulator
                 // get the byte from the FIFO
                 data = m_fifo_in.Front();
                 m_fifo_in.Pop();
+
+                if (m_joystick && !m_joystickqueue.empty())
+                {
+                    COMMIT {
+                        m_hwbuf_in = m_joystickqueue.front();
+                        m_joystickqueue.pop_front();
+                        m_hwbuf_in_full = true;
+                        DebugIOWrite("Moved a byte from joystick queue to input latch: %#02x", (unsigned)m_hwbuf_in);
+                    }
+                    m_receiveEnable.Set();
+                } else if (m_joystick)
+                {
+                    DebugIOWrite("Joystick queue empty");
+                }
 
                 DebugIOWrite("Extracted one byte from input FIFO for device %u", (unsigned)from);
             }
@@ -573,6 +630,23 @@ namespace Simulator
         return true;
     }
 
+    void UART::OnInputEvent(MGInputEvent event)
+    {
+        //Actually let's queue enough bytes to capture every possible event for now and worry about optimisation later.
+        unsigned char *buff = (unsigned char *)(void *)&event;
+        int i = 0;
+        if (m_joystickqueue.empty() && !m_hwbuf_in_full)
+        {
+            m_hwbuf_in = buff[0];
+            m_hwbuf_in_full = true;
+            m_receiveEnable.Set();
+            i = 1;
+        }
+        for (; i < 10; i++)
+        {
+            m_joystickqueue.push_back(buff[i]);
+        }
+    }
 
     bool UART::OnStreamReady(int fd, Selector::StreamState state)
     {
@@ -587,7 +661,24 @@ namespace Simulator
             }
             else
             {
-                ssize_t res = read(fd, &m_hwbuf_in, 1);
+                ssize_t res;
+                if (!m_joystick)
+                {
+                    res = read(fd, &m_hwbuf_in, 1);
+                }
+                else
+                {
+                    unsigned char joybuffer[8];
+                    res = read(fd, &joybuffer, 8);
+                    if (res == 8)
+                    {
+                        DebugIOWrite("Read event from joystick %#02x %#02x %#02x %#02x %#02x %#02x %#02x %#02x",
+                                        joybuffer[0], joybuffer[1], joybuffer[2], joybuffer[3],
+                                        joybuffer[4], joybuffer[5], joybuffer[6], joybuffer[7]);
+                        m_hwbuf_in = joybuffer[0];
+                        m_joystickqueue.assign(joybuffer+1, joybuffer+8);
+                    }
+                }
                 if (res == 0)
                 {
                     m_eof = true;
@@ -605,7 +696,7 @@ namespace Simulator
                 }
                 else
                 {
-                    assert(res == 1);
+                    assert((!m_joystick && res == 1) || (m_joystick && res == 8));
                     m_hwbuf_in_full = true;
                     m_receiveEnable.Set();
                     DebugIOWrite("Acquired one byte from fd %d to input latch: %#02x", fd, (unsigned)m_hwbuf_in);

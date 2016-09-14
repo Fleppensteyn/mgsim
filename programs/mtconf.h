@@ -57,6 +57,8 @@ extern size_t mg_gfxctl_devid;
 extern size_t mg_gfxfb_devid;
 extern size_t mg_rpc_devid;
 extern size_t mg_rpc_chanid;
+extern size_t mg_joyinput_devids[4];
+extern char mg_joyinput_devcount;
 
 extern volatile uint32_t *mg_gfx_ctl;
 extern void *mg_gfx_fb;

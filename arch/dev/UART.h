@@ -3,6 +3,7 @@
 #define UART_H
 
 #include "Selector.h"
+#include "SDLInputManager.h"
 
 #include "arch/IOMessageInterface.h"
 #include "sim/kernel.h"
@@ -16,7 +17,8 @@ namespace Simulator
 {
 
     class UART : public IIOMessageClient, public ISelectorClient,
-                 public Object, public Inspect::Interface<Inspect::Info|Inspect::Read>
+                 public Object, public Inspect::Interface<Inspect::Info|Inspect::Read>,
+                 public ISDLInputClient
     {
         IOMessageInterface& m_ioif;
         IODeviceID m_devid;
@@ -74,6 +76,11 @@ namespace Simulator
         Process p_dummy;
         Result DoNothing() { COMMIT{ p_dummy.Deactivate(); }; return SUCCESS; }
 
+
+        DefineStateVariable(bool, joystick);
+        std::deque<unsigned char> m_joystickqueue;
+        int m_sdljoyindex;
+
     public:
         UART(const std::string& name, Object& parent,
              IOMessageInterface& iobus, IODeviceID devid);
@@ -90,6 +97,8 @@ namespace Simulator
         // From ISelectorClient
         bool OnStreamReady(int fd, Selector::StreamState state) override;
         std::string GetSelectorClientName() const override;
+
+        void OnInputEvent(MGInputEvent event) override;
 
         /* debug */
         void Cmd_Read(std::ostream& out, const std::vector<std::string>& arguments) const override;

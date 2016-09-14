@@ -33,6 +33,7 @@
 #include "arch/dev/UART.h"
 #include "arch/dev/RPC.h"
 #include "arch/dev/RPC_unix.h"
+#include "arch/dev/JoyInput.h"
 
 #include "sim/rusage.h"
 #include "sim/getclassname.h"
@@ -870,6 +871,10 @@ MGSystem::MGSystem(Config& config, bool quiet)
             RPCInterface* rpc = new RPCInterface(name, *m_root, ic, devid, *uif);
             m_devices[i] = rpc;
             RegisterModelObject(*rpc, "rpc");
+        } else if (dev_type == "JoyInput") {
+            JoyInput* joyinput = new JoyInput(name, *m_root, ic, devid);
+            m_devices[i] = joyinput;
+            RegisterModelObject(*joyinput, "joyinput");
         } else {
             throw runtime_error("Unknown I/O device type: " + dev_type);
         }

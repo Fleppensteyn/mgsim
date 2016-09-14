@@ -1,5 +1,6 @@
 #include "simreadline.h"
 #include <arch/dev/Display.h>
+#include <arch/dev/SDLInputManager.h>
 
 #include <sys/time.h>
 #include <sstream>
@@ -16,7 +17,7 @@ using namespace Simulator;
 using namespace std;
 
 int CommandLineReader::ReadLineHook(void) {
-    auto dm = DisplayManager::GetManager();
+    auto dm = SDLInputManager::GetManager();
     if (!dm)
         return 0;
 
@@ -34,7 +35,7 @@ int CommandLineReader::ReadLineHook(void) {
     long current = tv.tv_sec * 10 + tv.tv_usec / 100000;
     if (current - last_check)
     {
-        dm->CheckEvents();
+        dm->CheckEvents(true);
         last_check = current;
     }
     return 0;

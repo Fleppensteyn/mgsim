@@ -11,6 +11,7 @@
 namespace Simulator
 {
     struct SDLContext;
+    class SDLInputManager;
     class Display : public Object
     {
         class ControlInterface;
@@ -123,16 +124,16 @@ namespace Simulator
         void ResetWindowCaption() const;
 
         // Reset: force re-creating windows, renderer, etc (used by
-        // DisplayManager below)
+        // SDLInputManager below)
         void ResetDisplay();
         // CloseWindow: delete window and renderer
         void CloseWindow();
 
-        friend class DisplayManager;
+        friend class SDLInputManager;
     };
 
-
-    class DisplayManager
+#if 0
+    class SDLInputManager
     {
     public:
         // RegisterDisplay/UnregisterDisplay: register/unregister a
@@ -174,7 +175,7 @@ namespace Simulator
 
         // Singleton methods
         static void CreateManagerIfNotExists(Config& cfg);
-        static DisplayManager* GetManager() { return g_singleton; }
+        static SDLInputManager* GetManager() { return g_singleton; }
 
     protected:
         bool                   m_sdl_initialized;    ///< Whether SDL is available
@@ -182,13 +183,13 @@ namespace Simulator
         unsigned               m_refreshDelay;      ///< Current refresh delay as set by user
         CycleNo                m_lastUpdate;        ///< Cycle number of last check
         std::vector<Display*>  m_displays;          ///< Currently registered Display instances
-        static DisplayManager* g_singleton;         ///< Singleton instance
+        static SDLInputManager* g_singleton;         ///< Singleton instance
 
 
         // Constructor, used by CreateManagerIfNotExists.
-        DisplayManager(unsigned refreshDelay);
+        SDLInputManager(unsigned refreshDelay);
     };
-
+#endif
 }
 
 #endif

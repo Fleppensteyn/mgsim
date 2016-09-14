@@ -43,7 +43,8 @@ DEVICE_SRC = \
 	arch/dev/LCD.h \
         arch/dev/Display.h \
         arch/dev/Display.cpp \
-	arch/dev/DisplayDraw.cpp \
+    arch/dev/DisplayDraw.cpp \
+	arch/dev/SDLInputManager.cpp \
 	arch/dev/sdl_wrappers.h \
         arch/dev/ELF.h \
         arch/dev/ELFLoader.h \
@@ -61,7 +62,9 @@ DEVICE_SRC = \
         arch/dev/SMC.h \
         arch/dev/SMC.cpp \
         arch/dev/UART.h \
-        arch/dev/UART.cpp
+        arch/dev/UART.cpp \
+        arch/dev/JoyInput.h \
+        arch/dev/JoyInput.cpp
 BUILT_SOURCES += arch/dev/RPC.h
 
 PROCESSOR_SRC = \

@@ -1,4 +1,5 @@
 #include <arch/dev/Display.h>
+#include <arch/dev/SDLInputManager.h>
 #include <arch/dev/sdl_wrappers.h>
 #include <sim/sampling.h>
 
@@ -304,8 +305,8 @@ namespace Simulator
 
         if (GetConf("GfxEnableSDLOutput", bool))
         {
-            DisplayManager::CreateManagerIfNotExists(*GetKernel()->GetConfig());
-            auto dm = DisplayManager::GetManager();
+            SDLInputManager::CreateManagerIfNotExists(*GetKernel()->GetConfig());
+            auto dm = SDLInputManager::GetManager();
             if (dm == NULL || !dm->IsSDLInitialized())
                 cerr << "# " << GetName() << ": unable to use SDL, output to screen disabled" << endl;
             else
@@ -323,7 +324,7 @@ namespace Simulator
 
     Display::~Display()
     {
-        auto dm = DisplayManager::GetManager();
+        auto dm = SDLInputManager::GetManager();
         if (dm != NULL)
             dm->UnregisterDisplay(this);
         CloseWindow();
@@ -511,7 +512,7 @@ namespace Simulator
     {
         if (m_sdl_context->window)
         {
-            auto dm = DisplayManager::GetManager();
+            auto dm = SDLInputManager::GetManager();
             assert(dm != NULL);
 
             auto caption = "MGSim display: "
@@ -543,7 +544,7 @@ namespace Simulator
             m_sdl_context->texture = 0;
         }
     }
-
+#if 0
     static unsigned currentDelayScale(unsigned x)
     {
         for (unsigned i = 10000000; i > 0; i /= 10)
@@ -551,7 +552,7 @@ namespace Simulator
         return 1;
     }
 
-    void DisplayManager::RegisterDisplay(Display *disp)
+    void SDLInputManager::RegisterDisplay(Display *disp)
     {
         for (auto p : m_displays)
             if (p == disp)
@@ -559,12 +560,12 @@ namespace Simulator
         m_displays.push_back(disp);
     }
 
-    void DisplayManager::UnregisterDisplay(Display *disp)
+    void SDLInputManager::UnregisterDisplay(Display *disp)
     {
         remove(m_displays.begin(), m_displays.end(), disp);
     }
 
-    void DisplayManager::GetMaxWindowSize(unsigned& w, unsigned& h)
+    void SDLInputManager::GetMaxWindowSize(unsigned& w, unsigned& h)
     {
         if (!m_sdl_initialized)
             return;
@@ -582,21 +583,21 @@ namespace Simulator
         }
     }
 
-    void DisplayManager::ResetDisplays() const
+    void SDLInputManager::ResetDisplays() const
     {
         for (auto d : m_displays)
             d->ResetDisplay();
     }
 
-    DisplayManager* DisplayManager::g_singleton = 0;
+    SDLInputManager* SDLInputManager::g_singleton = 0;
 
-    void DisplayManager::CreateManagerIfNotExists(Config& cfg)
+    void SDLInputManager::CreateManagerIfNotExists(Config& cfg)
     {
         if (g_singleton == 0)
-            g_singleton = new DisplayManager(cfg.getValue<unsigned>("SDLRefreshDelay"));
+            g_singleton = new SDLInputManager(cfg.getValue<unsigned>("SDLRefreshDelay"));
     }
 
-    DisplayManager::DisplayManager(unsigned refreshDelay)
+    SDLInputManager::SDLInputManager(unsigned refreshDelay)
         : m_sdl_initialized(false),
           m_refreshDelay_orig(refreshDelay),
           m_refreshDelay(refreshDelay),
@@ -613,7 +614,7 @@ namespace Simulator
             atexit(SDL_Quit);
     }
 
-    void DisplayManager::CheckEvents()
+    void SDLInputManager::CheckEvents()
     {
         SDL_Event event;
         while (SDL_PollEvent(&event))
@@ -703,7 +704,5 @@ namespace Simulator
         for (auto d : m_displays)
             d->Show();
     }
-
-
-
+#endif
 }
