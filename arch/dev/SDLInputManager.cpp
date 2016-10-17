@@ -122,17 +122,15 @@ namespace Simulator
     bool SDLInputManager::RegisterJoystickClient(ISDLInputClient& client, int joyindex)
     {
         if (!IsJoystickAvailable(joyindex))
-        {
             return false;
-        }
+
         SDLInputClientContext context;
         context.client = &client;
         context.joyindex = joyindex;
         context.joystick = SDL_JoystickOpen(joyindex);
         if (!context.joystick)
-        {
             return false;
-        }
+
         context.joyinfo.id = SDL_JoystickInstanceID(context.joystick);
         context.joyinfo.nbuttons = SDL_JoystickNumButtons(context.joystick);
         context.joyinfo.naxes = SDL_JoystickNumAxes(context.joystick);
@@ -149,9 +147,8 @@ namespace Simulator
             if (item.second.client == &client)
             {
                 if (SDL_JoystickGetAttached(item.second.joystick))
-                {
                     SDL_JoystickClose(item.second.joystick);
-                }
+
                 m_joystickclients.erase(item.first);
                 return true;
             }
@@ -162,9 +159,8 @@ namespace Simulator
     bool SDLInputManager::RegisterMouseClient(ISDLInputClient& client)
     {
         if (m_mouseclient.joyindex == 1)
-        {
             return false;
-        }
+
         SDLInputClientContext mousecontext;
         mousecontext.joyindex = 1;
         mousecontext.client = &client;
@@ -180,18 +176,17 @@ namespace Simulator
     bool SDLInputManager::UnregisterMouseClient(ISDLInputClient& client)
     {
         if (m_mouseclient.client != &client)
-        {
             return false;
-        }
+
         m_mouseclient = SDLInputClientContext();
         return true;
     }
 
     bool SDLInputManager::RegisterTouchClient(ISDLInputClient& client)
     {
-        if (m_touchclient.joyindex == 1){
+        if (m_touchclient.joyindex == 1)
             return false;
-        }
+
         SDLInputClientContext touchcontext;
         touchcontext.joyindex = 1;
         touchcontext.client = &client;
@@ -207,9 +202,8 @@ namespace Simulator
     bool SDLInputManager::UnregisterTouchClient(ISDLInputClient& client)
     {
         if (m_touchclient.client != &client)
-        {
             return false;
-        }
+
         m_touchclient = SDLInputClientContext();
         return true;
     }
@@ -217,9 +211,8 @@ namespace Simulator
     JoystickInfo SDLInputManager::GetJoystickInfo(int index) const
     {
         if (SDL_NumJoysticks() <= index)
-        {
             return JoystickInfo();
-        }
+
         for (const auto& client : m_joystickclients)
         {
             if (client.second.joyindex == index)
@@ -241,7 +234,6 @@ namespace Simulator
     MGInputEvent SDLInputManager::ConvertSDLEvent(SDL_Event *event)
     {
         MGInputEvent mgev;
-        // memset(&mgev,0,20);
         mgev.common.timestamp = event->common.timestamp;
         switch (event->type)
         {
@@ -317,9 +309,8 @@ namespace Simulator
     bool SDLInputManager::UpdateJoystickState(int index, JoystickState& state)
     {
         if (SDL_NumJoysticks() <= index)
-        {
             return false;
-        }
+
         for (const auto& client : m_joystickclients)
         {
             if (client.second.joyindex == index)
@@ -356,9 +347,8 @@ namespace Simulator
     bool SDLInputManager::UpdateMouseState(JoystickState& state)
     {
         if (m_mouseclient.joyindex != 1)
-        {
             return false;
-        }
+
         state.axes.resize(2);
         state.buttons.resize(1);
         state.balls.resize(4);
@@ -366,8 +356,8 @@ namespace Simulator
         state.balls[1] = 0;
         state.balls[2] = 0;
         state.balls[3] = 0;
-        int x,y;
-        state.buttons[0] = (unsigned char)SDL_GetMouseState(&x,&y);
+        int x, y;
+        state.buttons[0] = (unsigned char)SDL_GetMouseState(&x, &y);
         state.axes[0] = x;
         state.axes[1] = y;
         return true;

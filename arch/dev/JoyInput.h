@@ -8,17 +8,7 @@
 #include "sim/kernel.h"
 #include "sim/flag.h"
 
-
 class Config;
-
-enum
-{
-    JOYINPUT_JOYSTICK = 1,
-    JOYINPUT_MOUSE,
-    JOYINPUT_TOUCH,
-    JOYINPUT_REPLAY
-};
-
 
 namespace Simulator
 {
@@ -45,6 +35,10 @@ namespace Simulator
         Process p_SendInterrupt;
         DefineStateVariable(IONotificationChannelID, interruptChannel);
         Result DoSendInterrupt();
+
+/*        Flag    m_delayResponse;
+        Process p_DelayedResponse;
+        Result DelayedResponse();*/
 
         int m_sdljoyindex;
         int m_devicetype;

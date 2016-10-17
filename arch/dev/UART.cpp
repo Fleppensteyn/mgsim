@@ -512,7 +512,8 @@ namespace Simulator
                         DebugIOWrite("Moved a byte from joystick queue to input latch: %#02x", (unsigned)m_hwbuf_in);
                     }
                     m_receiveEnable.Set();
-                } else if (m_joystick)
+                }
+                else if (m_joystick)
                 {
                     DebugIOWrite("Joystick queue empty");
                 }

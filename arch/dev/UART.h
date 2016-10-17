@@ -78,7 +78,7 @@ namespace Simulator
 
 
         DefineStateVariable(bool, joystick);
-        std::deque<unsigned char> m_joystickqueue;
+        std::deque<unsigned char> m_joystickqueue; //Acts as a buffer for bytes of joystick events
         int m_sdljoyindex;
 
     public:
@@ -98,6 +98,7 @@ namespace Simulator
         bool OnStreamReady(int fd, Selector::StreamState state) override;
         std::string GetSelectorClientName() const override;
 
+        // From ISDLInputClient
         void OnInputEvent(MGInputEvent event) override;
 
         /* debug */

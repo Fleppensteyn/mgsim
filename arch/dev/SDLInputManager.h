@@ -77,7 +77,9 @@ namespace Simulator
         }
 
         // CheckEvents: poll the SDL event queue and dispatch events
-        // to the appropriate display. Used by OnCycle and CommandLineReader::ReadLineHook.
+        // to the appropriate display or input device client.
+        // Only refreshes the displays when refreshWindows is true.
+        // Used by OnCycle and CommandLineReader::ReadLineHook.
         void CheckEvents(bool refreshWindows);
 
 
@@ -93,23 +95,36 @@ namespace Simulator
         // used after deserializing a simulation state.
         void ResetDisplays() const;
 
+        // IsJoystickAvailable: Checks if there is an SDL joystick available with this index
         bool IsJoystickAvailable(int index) const;
 
+        // (Un)RegisterJoystickClient: Register a client for a certain joystick
+        // indicated by the index. This client will then receive all input events
+        // until it unregisters itself.
+        // Returns true if the registration was successful or false if the joystick wasn't available.
         bool RegisterJoystickClient(ISDLInputClient& client, int joyindex);
         bool UnregisterJoystickClient(ISDLInputClient& client);
 
+        // (Un)RegisterMouseClient: Similar to registering Joysticks, but
+        // given that SDL combines all mice into one mouse
+        // there can only be one client for it.
         bool RegisterMouseClient(ISDLInputClient& client);
         bool UnregisterMouseClient(ISDLInputClient& client);
 
+        // (Un)RegisterTouchClient: Similar to the mouse there can only be one touch client.
         bool RegisterTouchClient(ISDLInputClient& client);
         bool UnregisterTouchClient(ISDLInputClient& client);
 
+        // Methods to request information about connected input devices.
         JoystickInfo GetJoystickInfo(int index) const;
         JoystickInfo GetMouseInfo() const;
         JoystickInfo GetTouchInfo() const;
+
+        // Updates the state according to SDLs internal state.
         bool UpdateJoystickState(int index, JoystickState& state);
         bool UpdateMouseState(JoystickState& state);
 
+        // ConvertSDLEvent: Converts an SDL event to a corresponding MGInputEvent.
         MGInputEvent ConvertSDLEvent(SDL_Event *event);
 
         // Singleton methods
@@ -117,16 +132,16 @@ namespace Simulator
         static SDLInputManager* GetManager() { return g_singleton; }
 
     protected:
-        bool                   m_sdl_initialized;    ///< Whether SDL is available
+        bool                   m_sdl_initialized;   ///< Whether SDL is available
         unsigned               m_refreshDelay_orig; ///< Initial refresh delay from config
         unsigned               m_refreshDelay;      ///< Current refresh delay as set by user
-        unsigned               m_inputPollDelay;
+        unsigned               m_inputPollDelay;    ///< Separate delay for input event checking
         CycleNo                m_lastUpdate;        ///< Cycle number of last check
-        CycleNo                m_lastInputPoll;
+        CycleNo                m_lastInputPoll;     ///< Cycle of the last input event check
         std::vector<Display*>  m_displays;          ///< Currently registered Display instances
-        std::map<int, SDLInputClientContext> m_joystickclients;
-        SDLInputClientContext m_mouseclient;
-        SDLInputClientContext m_touchclient;
+        std::map<int, SDLInputClientContext> m_joystickclients; ///< Maps clients to the internal SDL id of their connected joystick
+        SDLInputClientContext m_mouseclient; ///< Info about a client for the mouse
+        SDLInputClientContext m_touchclient; ///< Info about a client for touch input
 
         static SDLInputManager* g_singleton;         ///< Singleton instance
 

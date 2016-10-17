@@ -3,6 +3,14 @@
 
 using namespace std;
 
+enum
+{
+    JOYINPUT_JOYSTICK = 1,
+    JOYINPUT_MOUSE,
+    JOYINPUT_TOUCH,
+    JOYINPUT_REPLAY
+};
+
 namespace Simulator
 {
     JoyInput::JoyInput(const string& name, Object& parent,
@@ -20,6 +28,9 @@ namespace Simulator
           InitProcess(p_SendInterrupt, DoSendInterrupt),
           InitStateVariable(interruptChannel, 0),
 
+/*          InitStorage(m_delayResponse, m_clock, false),
+          InitProcess(p_DelayedResponse, DelayedResponse),*/
+
           m_sdljoyindex(-1),
           m_devicetype(0),
           m_eventqueue(),
@@ -30,25 +41,27 @@ namespace Simulator
           m_replaydata()
     {
         string type = GetConf("JoyInputDeviceType", string);
-        if (type == "MOUSE"){
+        if (type == "MOUSE")
             m_devicetype = JOYINPUT_MOUSE;
-        } else if (type == "TOUCH"){
+        else if (type == "TOUCH")
             m_devicetype = JOYINPUT_TOUCH;
-        } else if (type == "JOYSTICK"){
+        else if (type == "JOYSTICK")
+        {
             m_sdljoyindex = GetConf("InputJoystickIndex", int);
             m_devicetype = JOYINPUT_JOYSTICK;
-        } else if (type == "REPLAY"){
-            m_devicetype = JOYINPUT_REPLAY;
-        } else {
-            throw exceptf<InvalidArgumentException>("No device type for JoyInput specified:");
         }
+        else if (type == "REPLAY")
+            m_devicetype = JOYINPUT_REPLAY;
+        else
+            throw exceptf<InvalidArgumentException>("No device type for JoyInput specified");
 
         string replayfilename = GetConfOpt("JoyInputReplayFile", string,"");
         if (replayfilename != "")
         {
             if (m_devicetype == JOYINPUT_REPLAY)
                 m_replayfile = fopen(replayfilename.c_str(),"r");
-            else{
+            else
+            {
                 m_replayfile = fopen(replayfilename.c_str(),"w");
                 m_writereplay = true;
             }
@@ -59,6 +72,8 @@ namespace Simulator
         }
         p_SendInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid));
         m_interrupt.Sensitive(p_SendInterrupt);
+/*        p_DelayedResponse.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid));
+        m_delayResponse.Sensitive(p_DelayedResponse);*/
         RegisterModelObject(*this, "joyinput");
     }
 
@@ -69,7 +84,7 @@ namespace Simulator
 
     StorageTraceSet JoyInput::GetReadRequestTraces() const
     {
-        return m_ioif.GetRequestTraces(m_devid);
+        return m_ioif.GetRequestTraces(m_devid);// ^ opt(m_delayResponse);
     }
 
     StorageTraceSet JoyInput::GetWriteRequestTraces() const
@@ -87,6 +102,31 @@ namespace Simulator
         return SUCCESS;
     }
 
+/*    Result JoyInput::DelayedResponse()
+    {
+        DebugIOWrite("Stalling for input component replay");
+        if (m_replaydata.cycle > GetKernel()->GetCycleNo())
+            return FAILED;
+
+        m_delayResponse.Clear();
+        DebugIOWrite("Stalling for input component replay completed");
+        COMMIT { LoadNextReplayEvent(); }
+        if (m_replaydata.type == 'w')
+            return SUCCESS;
+
+        IOMessage *msg = m_ioif.CreateReadResponse(m_devid, m_replaydata.addr, m_replaydata.size);
+        COMMIT {
+            memcpy(&msg->read_response.data.data[0], &m_replaydata.data[0],m_replaydata.size);
+        }
+
+        if (!m_ioif.SendMessage(m_devid, m_replaydata.from, msg))
+        {
+            DeadlockWrite("Cannot send delayed input component read response to I/O bus");
+            return FAILED;
+        }
+        return SUCCESS;
+    }*/
+
     bool JoyInput::OnWriteRequestReceived(IODeviceID from, MemAddr addr, const IOData& iodata)
     {
         DebugIOWrite("Write from device %u to %#016llx/%u", (unsigned)from, (unsigned long long)addr, (unsigned)iodata.size);
@@ -97,23 +137,29 @@ namespace Simulator
 
         if (m_devicetype == JOYINPUT_REPLAY)
         {
-            // printf("%c w | %u %u | %lu %lu | %lu %lu | %02x %02x\n",m_replaydata.type, m_replaydata.from, from,
-            //     m_replaydata.addr, addr, m_replaydata.size, iodata.size, m_replaydata.data[0], iodata.data[0]);
             if (m_replaydata.type == 'w' &&
                 from == m_replaydata.from && addr == m_replaydata.addr &&
                 iodata.size == m_replaydata.size && iodata.data[0] == m_replaydata.data[0])
             {
-                COMMIT {
-                    LoadNextReplayEvent();
-                }
+                // if (m_replaydata.cycle > GetKernel()->GetCycleNo())
+                // {
+                //     m_delayResponse.Set();
+                // }
+                // else
+                // {
+                    COMMIT {
+                        LoadNextReplayEvent();
+                    }
+                // }
                 return true;
             }
             else
                 throw exceptf<>(*this, "Write request did not match JoyInput replay data.");
         } else if (m_writereplay)
         {
-            COMMIT{
-                fprintf(m_replayfile,"%lu w %u %lu %lu %02x\n",GetKernel()->GetCycleNo(),from,addr,iodata.size,(unsigned char)*iodata.data);
+            COMMIT {
+                fprintf(m_replayfile,"%lu w %u %lu %lu %02x\n",GetKernel()->GetCycleNo(), from, addr,
+                                                               iodata.size,(unsigned char)*iodata.data);
                 fflush(m_replayfile);
             }
         }
@@ -141,7 +187,6 @@ namespace Simulator
                             m_enabled = false;
                             m_eventqueue.clear();
                         }
-
                     }
                     else if (m_devicetype == JOYINPUT_TOUCH)
                     {
@@ -204,7 +249,11 @@ namespace Simulator
                 COMMIT { m_events_enabled = (data != 0); }
                 break;
             case 2:
-                COMMIT { m_interrupt_enabled = (data != 0); }
+                if (data && m_writereplay)
+                    throw exceptf<>(*this, "Enabling JoyInput interrupts is not supported when recording a replay");
+                COMMIT {
+                    m_interrupt_enabled = (data != 0);
+                }
                 break;
             case 3:
                 COMMIT { m_interruptChannel = data; }
@@ -230,12 +279,15 @@ namespace Simulator
 
         if (m_devicetype == JOYINPUT_REPLAY)
         {
-            // printf("%c r | %u %u | %lu %lu | %lu %lu\n",m_replaydata.type, m_replaydata.from, from,
-                // m_replaydata.addr, addr, m_replaydata.size, size);
             if (m_replaydata.type == 'r' &&
                 from == m_replaydata.from && addr == m_replaydata.addr &&
                 size == m_replaydata.size)
             {
+                // if (m_replaydata.cycle > GetKernel()->GetCycleNo())
+                // {
+                //     m_delayResponse.Set();
+                //     return true;
+                // }
                 msg = m_ioif.CreateReadResponse(m_devid, addr, size);
                 COMMIT{
                     memcpy(&msg->read_response.data.data[0], &m_replaydata.data[0],size);
@@ -391,16 +443,12 @@ namespace Simulator
             throw exceptf<>(*this, "Invalid read from device %u to %#016llx/%u", (unsigned)from, (unsigned long long)addr, (unsigned)size);
         }
 
-        if (m_writereplay){
+        if (m_writereplay)
+        {
             COMMIT{
-                fprintf(m_replayfile, "%lu r %u %lu %lu ",GetKernel()->GetCycleNo(),from,addr,size);
-                // for (unsigned i = 0; i < size; i++)
-                if (size == 1)
-                    fprintf(m_replayfile, "%02x",(unsigned char)msg->read_response.data.data[0]);
-                else if (size == 2)
-                    fprintf(m_replayfile, "%04x", *(unsigned short *)msg->read_response.data.data,*(unsigned short *)msg->read_response.data.data);
-                else if (size == 4)
-                    fprintf(m_replayfile, "%08x", *(unsigned int *)msg->read_response.data.data,*(unsigned int *)msg->read_response.data.data);
+                fprintf(m_replayfile, "%lu r %u %lu %lu",GetKernel()->GetCycleNo(),from,addr,size);
+                for (unsigned i = 0; i < size; i++)
+                    fprintf(m_replayfile, " %02x",(unsigned char)msg->read_response.data.data[i]);
                 fprintf(m_replayfile,"\n");
             }
         }
@@ -416,7 +464,8 @@ namespace Simulator
     void JoyInput::OnInputEvent(MGInputEvent event)
     {
         DebugIOWrite("Received Event");
-        if (m_events_enabled){
+        if (m_events_enabled)
+        {
             m_eventqueue.push_back(event);
             if (m_interrupt_enabled)
                 m_interrupt.Set();
@@ -466,22 +515,27 @@ namespace Simulator
     }
 
     void JoyInput::LoadNextReplayEvent(){
-        int res = fscanf(m_replayfile,"%llu %c %hu %llu %hhu %x\n",&m_replaydata.cycle,
+        int res = fscanf(m_replayfile,"%lu %c %hu %lu %hhu",&m_replaydata.cycle,
                          &m_replaydata.type, &m_replaydata.from, &m_replaydata.addr,
-                         &m_replaydata.size,(unsigned *)&m_replaydata.data[0]);
-        if (res == EOF)
+                         &m_replaydata.size);
+        if (res == 5)
+        {
+            for (unsigned i = 0; i < m_replaydata.size; i++)
+            {
+                if (fscanf(m_replayfile," %02hhx",&m_replaydata.data[i]) != 1)
+                    throw exceptf<>(*this,"Format of JoyInput replaydata doesn't match expectation");
+            }
+            DebugIOWrite("Loaded the next line of the replay file");
+        }
+        else if (res == EOF)
         {
             DebugIOWrite("End of replay file reached");
             memset(&m_replaydata,0,sizeof(struct ReplayData));
             m_replaydata.type = -1;
+            return;
         }
-        else if (res != 6){
-            printf("%llu %c %hu %llu %hhu %x\n", m_replaydata.cycle,
-                         m_replaydata.type, m_replaydata.from, m_replaydata.addr,
-                         m_replaydata.size,*(unsigned *)&m_replaydata.data[0]);
+        else
             throw exceptf<>(*this,"Format of JoyInput replaydata doesn't match expectation");
-        }
-        DebugIOWrite("Loaded the next line of the replay file");
     }
 
     const string& JoyInput::GetIODeviceName() const
