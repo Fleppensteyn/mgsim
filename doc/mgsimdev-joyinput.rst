@@ -127,6 +127,7 @@ INTERFACE
 The device presents itself with an interface with regions switched on certain bits in
 the adress. The table below will tell you more about access widths and what certain
 regions contain. Keep in mind that any non 1 width memory accesses should be aligned.
+
 +----------------------+--------------+-------+-----+-----------------------------------------------+
 | Adress bit values    |              |       |     |                                               |
 +-------+----+---+-----+ Hex          | Width | R/W | Description                                   |
