@@ -79,46 +79,87 @@ access to the current state of the connected device.
 Controlling the device and interface info
 -----------------------------------------
 The first part of memory serves to control the device and is the only part of memory
-that can be written to. This part can turn the device on, activate events, configure
-and enable notifications and pop the event queue. It can tell you what kind of device
-is connected through SDL, what the notification channel is and how many events are
-queued.
+that can be written to.
+
+This part can turn the device on, activate events, configure and enable notifications
+and pop the event queue. It can tell you what kind of device is connected through SDL,
+what the notification channel is and how many events are queued.
+
 For enabling and disabling the device, events and notifications writing a nonzero value
 to their respective adresses will enable those respective functionalities while writing
 zero will disable them. Reading from these adresses will return either 0 for disabled
 or either the device type (for the adress that enables the device) or 1 to indicate if
 any of the features are enabled.
-Values for device type can be found at the top of ``Joyinput.cpp``, but currently they are starting from 1 and numbered sequentially: Joystick, Mouse, Touch.
-The notification channel can be set by writing to the adress while reading from it returns the current channel.
-The event queue can be popped by writing to the designated adress while reading from it will return the current queue length truncated to 255.
+
+Values for device type can be found at the top of ``Joyinput.cpp``, but currently they
+are starting from 1 and numbered sequentially: Joystick, Mouse, Touch.
+
+The notification channel can be set by writing to the adress while reading from it
+returns the current channel.
+
+The event queue can be popped by writing to the designated adress while reading from it will
+return the current queue length truncated to 255.
 
 Getting information about the connected device
 ----------------------------------------------
-This is the next region in memory and it can provide you with information about the SDL
-device and how to access latter regions in memory that provide direct access to the current device state.
-There are currently 4 different types of absolute value to be read from latter regions.
-These are absolute axes, binary state buttons, 4bit state hats, and two axis relative balls.
-This information can be read as a 4 byte value which contains 4 distinct byte sized values. These 4 values stand for the number of a certain kind of part, the access width
-used to access the region for this, the amount of bits that represent a single value, and the amount of items per value.
-This seems very unclear so I'll include an example.
+This is the next region in memory and it can provide you with information about the SDL device
+and how to access latter regions in memory that provide direct access to the current device state.
+
+
+There are currently 4 different types of values that can be accessed in the latter memory regions,
+these are absolute axes, binary state buttons, 4-bit state hats, and two axis relative balls.
+
+All the information you need to access one of the four latter regions is available in a
+single 4-byte read of which the bytes have individual meaning.
+There are currently four different 4-byte information values, one for each section.
+
+The 4 indivual bytes stand for the number of a certain kind of part, the access width
+used to access the region for this, the amount of bits that represent a single value,
+and the amount of items per value.
+
+===== =====================
+Bits  Contain
+===== =====================
+24-31 Amount of items
+16-23 Access width in bytes
+8-15  Bits per value
+0-7   Values per item
+===== =====================
+
+To make this more clear there is an example below.
+
 For instance there are 6 axes on the standard Xbox 360 controller, you can read values
 from the memory region for axes with 2 byte widths and every axe is represented by a
-16 bit value which represents 1 axis. Thus the bytes, from most significant to least
-significant, in the 4 byte value will be 0x06 0x02 0x10 0x01.
-Buttons are represented as single bits in a byte and thus you can get the state of
-8 buttons with a single read from the interface.
+16 bit value which represents 1 axis.
+
+Thus the bytes, from most significant to least significant, in the 4 byte value will be
+0x06 0x02 0x10 0x01.
+
+Buttons are represented as single bits in a byte and thus you can get the state of 8 buttons
+with a single read from the interface.
+
 Hats have their state information in the 4 least significant bits of the byte read
 from the interface and the more significant bits are not used at this point in time.
+
 Balls are sligthly different from the other categories since they have to represent a
-relative value for both the x- and y-axis at the same time, so these are presented individually as 2 byte values with two entries per ball (x and y respectively).
+relative value for both the x- and y-axis at the same time, so these are presented individually
+as 2 byte values with two entries per ball (x and y respectively).
+
+The main use for this section is to get the amount of a certain item as the other information
+values remain constant, but available in case some new iteration adds a new section or makes changes.
 
 Reading events
 --------------
-Events are read with aligned 4 byte reads from the region assigned to it and they take the form described in ``MGInputEvents.h``. Events can be popped using the method described in the "Controlling the device and interface info" section.
+Events are read with aligned 4 byte reads from the region assigned to it and they take
+the form described in ``MGInputEvents.h``.
+
+Events can be popped using the method described in the
+"Controlling the device and interface info" section.
 
 Reading the absolute state
 --------------------------
-The regions for absolute state information can be accessed using the information provided in the "Getting information about the connected device" section.
+The regions for absolute state information can be accessed using the information provided
+in the "Getting information about the connected device" section.
 
 
 INTERFACE
