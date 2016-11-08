@@ -56,6 +56,18 @@ Each ``uart`` device support the following configuration variables:
        the UART. The corresponding slave device is printed
        by MGSim prior to the simulation start-up.
 
+   ``JOYSTICK``
+       This mode connects to the Linux Joystick API and will read events
+       from the device specified with ``<dev>:UARTJoystick``. This mode
+       queues the 8 bytes from an event which can then be read sequentially.
+
+   ``SDLJOYSTICK``
+       This mode connects to a joystick through SDL. You can select the joystick
+       by its index using ``dev:UARTSDLJoystick``. MGInputEvents will be queued
+       as 10 bytes as that covers all MGJoyInputEvent variations. For more
+       information check ``MGInputEvents.h``.
+
+
 PROTOCOL
 ========
 
