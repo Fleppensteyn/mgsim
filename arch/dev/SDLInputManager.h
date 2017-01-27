@@ -147,7 +147,7 @@ namespace Simulator
 
 
         // Constructor, used by CreateManagerIfNotExists.
-        SDLInputManager(unsigned refreshDelay);
+        SDLInputManager(unsigned refreshDelay, unsigned inputPollDelay);
     };
     class ISDLInputClient
     {

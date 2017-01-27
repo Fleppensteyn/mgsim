@@ -223,7 +223,8 @@ namespace Simulator
         RegisterModelProperty(*this, "inpfifosz", m_fifo_in.GetMaxSize());
         RegisterModelProperty(*this, "outfifosz", m_fifo_out.GetMaxSize());
 
-        p_ReadInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid));
+        p_ReadInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid) * opt(m_readInterrupt));
+        p_WriteInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid) * opt(m_writeInterrupt));
         p_Receive.SetStorageTraces(m_fifo_in * opt(m_readInterrupt) * m_receiveEnable);
     }
 
@@ -234,6 +235,7 @@ namespace Simulator
             DeadlockWrite("Unable to send data ready interrupt to I/O bus");
             return FAILED;
         }
+        m_readInterrupt.Clear();
         return SUCCESS;
     }
 
@@ -244,6 +246,7 @@ namespace Simulator
             DeadlockWrite("Unable to send underrun interrupt to I/O bus");
             return FAILED;
         }
+        m_writeInterrupt.Clear();
         return SUCCESS;
     }
 
@@ -503,7 +506,7 @@ namespace Simulator
                 data = m_fifo_in.Front();
                 m_fifo_in.Pop();
 
-                if (m_joystick && !m_joystickqueue.empty())
+                if (m_joystick && !m_joystickqueue.empty() && !m_hwbuf_in_full)
                 {
                     COMMIT {
                         m_hwbuf_in = m_joystickqueue.front();
@@ -511,6 +514,10 @@ namespace Simulator
                         m_hwbuf_in_full = true;
                         DebugIOWrite("Moved a byte from joystick queue to input latch: %#02x", (unsigned)m_hwbuf_in);
                     }
+                    m_receiveEnable.Set();
+                }
+                else if (m_joystick && m_hwbuf_in_full && !m_receiveEnable.IsSet())
+                {
                     m_receiveEnable.Set();
                 }
                 else if (m_joystick)
@@ -656,7 +663,7 @@ namespace Simulator
         if (fd == m_fd_in && (state & Selector::READABLE))
         {
             // fprintf(stderr, "External fd %d is readable\n", fd);
-            if (m_hwbuf_in_full)
+            if (m_hwbuf_in_full || !m_joystickqueue.empty())
             {
                 DeadlockWrite("Cannot acquire byte, input latch busy");
             }

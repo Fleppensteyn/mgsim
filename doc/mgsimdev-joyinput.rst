@@ -66,6 +66,10 @@ CONFIGURATION
    and otherwise it will write out a recording of the current run which can be
    replayed at a later time.
 
+``SDLInputPollDelay``
+   The amount of system cycles between checking the SDL event queue. This is an
+   optional setting that defaults to 1000.
+
 
 PROTOCOL
 ========

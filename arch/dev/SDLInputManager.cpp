@@ -79,14 +79,15 @@ namespace Simulator
     void SDLInputManager::CreateManagerIfNotExists(Config& cfg)
     {
         if (g_singleton == 0)
-            g_singleton = new SDLInputManager(cfg.getValue<unsigned>("SDLRefreshDelay"));
+            g_singleton = new SDLInputManager(cfg.getValue<unsigned>("SDLRefreshDelay"),
+                                cfg.getValueOrDefault<unsigned>("SDLInputPollDelay",1000));
     }
 
-    SDLInputManager::SDLInputManager(unsigned refreshDelay)
+    SDLInputManager::SDLInputManager(unsigned refreshDelay, unsigned inputPollDelay)
         : m_sdl_initialized(false),
           m_refreshDelay_orig(refreshDelay),
           m_refreshDelay(refreshDelay),
-          m_inputPollDelay(1000),
+          m_inputPollDelay(inputPollDelay),
           m_lastUpdate(0),
           m_lastInputPoll(0),
           m_displays(),

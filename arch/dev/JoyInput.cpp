@@ -54,6 +54,15 @@ namespace Simulator
             m_devicetype = JOYINPUT_REPLAY;
         else
             throw exceptf<InvalidArgumentException>("No device type for JoyInput specified");
+        if (m_devicetype != JOYINPUT_REPLAY)
+        {
+            SDLInputManager::CreateManagerIfNotExists(*GetKernel()->GetConfig());
+            if (m_devicetype == JOYINPUT_JOYSTICK)
+            {
+                if (!SDLInputManager::GetManager()->IsJoystickAvailable(m_sdljoyindex))
+                    throw exceptf<InvalidArgumentException>("No SDL Joystick with index detected: %d", m_sdljoyindex);
+            }
+        }
 
         string replayfilename = GetConfOpt("JoyInputReplayFile", string,"");
         if (replayfilename != "")
@@ -70,7 +79,7 @@ namespace Simulator
             else if (m_devicetype == JOYINPUT_REPLAY)
                 LoadNextReplayEvent();
         }
-        p_SendInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid));
+        p_SendInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid) * opt(m_interrupt));
         m_interrupt.Sensitive(p_SendInterrupt);
 /*        p_DelayedResponse.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid));
         m_delayResponse.Sensitive(p_DelayedResponse);*/
@@ -99,6 +108,7 @@ namespace Simulator
             DeadlockWrite("Unable to send data ready interrupt to I/O bus");
             return FAILED;
         }
+        m_interrupt.Clear();
         return SUCCESS;
     }
 
@@ -253,6 +263,8 @@ namespace Simulator
                     throw exceptf<>(*this, "Enabling JoyInput interrupts is not supported when recording a replay");
                 COMMIT {
                     m_interrupt_enabled = (data != 0);
+                    if (data == 0 && m_interrupt.IsSet())
+                        m_interrupt.Clear();
                 }
                 break;
             case 3:
@@ -463,11 +475,11 @@ namespace Simulator
 
     void JoyInput::OnInputEvent(MGInputEvent event)
     {
-        DebugIOWrite("Received Event");
+        DebugIOWrite("Received Event with type %02x",event.common.type);
         if (m_events_enabled)
         {
             m_eventqueue.push_back(event);
-            if (m_interrupt_enabled)
+            if (m_interrupt_enabled && !m_interrupt.IsSet())
                 m_interrupt.Set();
         }
         switch (event.common.type)
