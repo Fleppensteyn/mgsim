@@ -223,9 +223,9 @@ namespace Simulator
         RegisterModelProperty(*this, "inpfifosz", m_fifo_in.GetMaxSize());
         RegisterModelProperty(*this, "outfifosz", m_fifo_out.GetMaxSize());
 
-        p_ReadInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid) * opt(m_readInterrupt));
-        p_WriteInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid) * opt(m_writeInterrupt));
-        p_Receive.SetStorageTraces(m_fifo_in * opt(m_readInterrupt) * m_receiveEnable);
+        p_ReadInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid));
+        p_WriteInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid));
+        p_Receive.SetStorageTraces(m_fifo_in * opt(m_readInterrupt) * opt(m_receiveEnable));
     }
 
     Result UART::DoSendReadInterrupt()
@@ -235,7 +235,6 @@ namespace Simulator
             DeadlockWrite("Unable to send data ready interrupt to I/O bus");
             return FAILED;
         }
-        m_readInterrupt.Clear();
         return SUCCESS;
     }
 
@@ -246,7 +245,6 @@ namespace Simulator
             DeadlockWrite("Unable to send underrun interrupt to I/O bus");
             return FAILED;
         }
-        m_writeInterrupt.Clear();
         return SUCCESS;
     }
 
@@ -333,10 +331,21 @@ namespace Simulator
             m_readInterrupt.Set();
         }
 
-        m_receiveEnable.Clear();
-        COMMIT { m_hwbuf_in_full = false; }
-
         DebugIOWrite("Pushed one byte from input latch to input FIFO: %#02x", (unsigned)m_hwbuf_in);
+
+        if (m_joystick && !m_joystickqueue.empty())
+        {
+            COMMIT {
+                m_hwbuf_in = m_joystickqueue.front();
+                m_joystickqueue.pop_front();
+                DebugIOWrite("Moved a byte from the Joystick queue to the input latch: %#02x", (unsigned)m_hwbuf_in);
+            }
+        }
+        else
+        {
+            m_receiveEnable.Clear();
+            COMMIT { m_hwbuf_in_full = false; }
+        }
 
         return SUCCESS;
     }
@@ -506,25 +515,6 @@ namespace Simulator
                 data = m_fifo_in.Front();
                 m_fifo_in.Pop();
 
-                if (m_joystick && !m_joystickqueue.empty() && !m_hwbuf_in_full)
-                {
-                    COMMIT {
-                        m_hwbuf_in = m_joystickqueue.front();
-                        m_joystickqueue.pop_front();
-                        m_hwbuf_in_full = true;
-                        DebugIOWrite("Moved a byte from joystick queue to input latch: %#02x", (unsigned)m_hwbuf_in);
-                    }
-                    m_receiveEnable.Set();
-                }
-                else if (m_joystick && m_hwbuf_in_full && !m_receiveEnable.IsSet())
-                {
-                    m_receiveEnable.Set();
-                }
-                else if (m_joystick)
-                {
-                    DebugIOWrite("Joystick queue empty");
-                }
-
                 DebugIOWrite("Extracted one byte from input FIFO for device %u", (unsigned)from);
             }
             break;
@@ -640,6 +630,7 @@ namespace Simulator
 
     void UART::OnInputEvent(MGInputEvent event)
     {
+        DebugIOWrite("Received Joystick Event");
         //Actually let's queue enough bytes to capture every possible event for now and worry about optimisation later.
         unsigned char *buff = (unsigned char *)(void *)&event;
         int i = 0;
@@ -663,7 +654,10 @@ namespace Simulator
         if (fd == m_fd_in && (state & Selector::READABLE))
         {
             // fprintf(stderr, "External fd %d is readable\n", fd);
-            if (m_hwbuf_in_full || !m_joystickqueue.empty())
+            //While the second condition seems redundant it handles a case where m_hwbuf_in_full is set to false
+            //and m_receiveEnable is cleared by DoReceive() in the same cycle that a selector becomes readable
+            //that lead to a full hardware buffer without m_receiveEnable being set, effectively stalling the UART
+            if (m_hwbuf_in_full || m_receiveEnable.IsSet())
             {
                 DeadlockWrite("Cannot acquire byte, input latch busy");
             }

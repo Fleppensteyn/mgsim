@@ -79,7 +79,7 @@ namespace Simulator
             else if (m_devicetype == JOYINPUT_REPLAY)
                 LoadNextReplayEvent();
         }
-        p_SendInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid) * opt(m_interrupt));
+        p_SendInterrupt.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid));
         m_interrupt.Sensitive(p_SendInterrupt);
 /*        p_DelayedResponse.SetStorageTraces(m_ioif.GetBroadcastTraces(m_devid));
         m_delayResponse.Sensitive(p_DelayedResponse);*/
@@ -98,7 +98,7 @@ namespace Simulator
 
     StorageTraceSet JoyInput::GetWriteRequestTraces() const
     {
-        return StorageTrace();
+        return opt(m_interrupt);
     }
 
     Result JoyInput::DoSendInterrupt()
@@ -108,7 +108,6 @@ namespace Simulator
             DeadlockWrite("Unable to send data ready interrupt to I/O bus");
             return FAILED;
         }
-        m_interrupt.Clear();
         return SUCCESS;
     }
 
@@ -272,6 +271,9 @@ namespace Simulator
                 break;
             case 4:
                 DebugIOWrite("Popping the event queue");
+                if (m_eventqueue.size() == 1)
+                    m_interrupt.Clear(); //Interrupt condition cleared
+
                 COMMIT {
                     if (!m_eventqueue.empty())
                         m_eventqueue.pop_front();

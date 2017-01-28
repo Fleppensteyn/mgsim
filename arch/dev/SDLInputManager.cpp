@@ -235,6 +235,7 @@ namespace Simulator
     MGInputEvent SDLInputManager::ConvertSDLEvent(SDL_Event *event)
     {
         MGInputEvent mgev;
+        memset(&mgev, 0, sizeof(MGInputEvent));
         mgev.common.timestamp = event->common.timestamp;
         switch (event->type)
         {
