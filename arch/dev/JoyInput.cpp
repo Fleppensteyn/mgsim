@@ -181,29 +181,16 @@ namespace Simulator
                 if (!data && m_enabled)
                 {
                     DebugIOWrite("De-activating the input component");
-                    if (m_devicetype == JOYINPUT_JOYSTICK)
-                    {
-                        COMMIT {
+                    COMMIT {
+                        m_enabled = false;
+                        m_eventqueue.clear();
+                        m_interrupt.Clear();
+                        if (m_devicetype == JOYINPUT_JOYSTICK)
                             SDLInputManager::GetManager()->UnregisterJoystickClient(*this);
-                            m_enabled = false;
-                            m_eventqueue.clear();
-                        }
-                    }
-                    else if (m_devicetype == JOYINPUT_MOUSE)
-                    {
-                        COMMIT {
+                        else if (m_devicetype == JOYINPUT_MOUSE)
                             SDLInputManager::GetManager()->UnregisterMouseClient(*this);
-                            m_enabled = false;
-                            m_eventqueue.clear();
-                        }
-                    }
-                    else if (m_devicetype == JOYINPUT_TOUCH)
-                    {
-                        COMMIT {
+                        else if (m_devicetype == JOYINPUT_TOUCH)
                             SDLInputManager::GetManager()->UnregisterTouchClient(*this);
-                            m_enabled = false;
-                            m_eventqueue.clear();
-                        }
                     }
                 }
                 else if (data && !m_enabled)
@@ -255,7 +242,13 @@ namespace Simulator
                 }
                 break;
             case 1:
-                COMMIT { m_events_enabled = (data != 0); }
+                COMMIT {
+                    m_events_enabled = (data != 0);
+                    if (!m_events_enabled){
+                        m_eventqueue.clear();
+                        m_interrupt.Clear();
+                    }
+                }
                 break;
             case 2:
                 if (data && m_writereplay)
@@ -308,150 +301,156 @@ namespace Simulator
                     LoadNextReplayEvent();
                 }
                 valid = true;
-                goto sendresponse;
+
             }
             else
                 throw exceptf<>(*this, "Read request did not match JoyInput replay data.");
         }
-
-        switch ((addr & ~0x3ffL) >> 10)
+        else
         {
-            case 0:
-                switch (addr & 0x300L)
-                {
-                    case 0: //control section
-                        if (size == 1){
-                            valid = true;
-                            unsigned char data = 0;
-                            switch (addr){
-                                case 0: // Is the component enabled
-                                    data = m_enabled? m_devicetype : 0;
-                                    break;
-                                case 1: // Events enabled?
-                                    data = m_events_enabled;
-                                    break;
-                                case 2: // Interrupts enabled?
-                                    data = m_interrupt_enabled;
-                                    break;
-                                case 3: // Interrupt channel
-                                    data = m_interruptChannel;
-                                    break;
-                                case 4: // Event queue size limited to byte size
-                                    data = (m_eventqueue.size() > 255) ? 255 : m_eventqueue.size();
-                                    break;
-                                default:
-                                    valid = false;
-                            }
-                            if (valid)
-                            {
-                                msg = m_ioif.CreateReadResponse(m_devid, addr, 1);
-                                COMMIT {
-                                    SerializeRegister(RT_INTEGER, data, msg->read_response.data.data, 1);
-                                }
-                            }
-                        }
-                        break;
-                    case 0x100://info on latter sections
-                        if (size == 4 && (addr % 4) == 0) {
-                            unsigned int data = 0;
-                            valid = true;
-                            int index = (addr & 0x7f) >> 2;
-                            switch (index)
-                            {
-                                //Number of items
-                                //Access width
-                                //bits per entry
-                                //entries per item
-                                case 0: //axes
-                                    data = (m_joyinfo.naxes << 24) | (2 << 16) | (16 << 8) | 1;
-                                    break;
-                                case 1://buttons
-                                    data = (m_joyinfo.nbuttons << 24) | (1 << 16) | (1 << 8) | 1;
-                                    break;
-                                case 2://hats
-                                    data = (m_joyinfo.nhats << 24) | (1 << 16) | (8 << 8) | 1;
-                                    break;
-                                case 3://balls
-                                    data = (m_joyinfo.nballs << 24) | (2 << 16) | (16 << 8) | 2;
-                                    break;
-                                default:
-                                    valid = false;
-                            }
-                            if (valid)
-                            {
-                                msg = m_ioif.CreateReadResponse(m_devid, addr, 4);
-                                COMMIT {
-                                    SerializeRegister(RT_INTEGER, data, msg->read_response.data.data, 4);
-                                }
-                            }
-                        }
-                        break;
-                    default: //event access
-                        if (size == 4 && (addr % 4) == 0 && m_events_enabled)
-                        {
-                            int index = (addr & 0xff) >> 2;
-                            if (index < 6 && m_eventqueue.size() > 0)
-                            {
-                                unsigned int *ev = (unsigned int *)(void *)&m_eventqueue.front();
+            switch ((addr & ~0x3ffL) >> 10)
+            {
+                case 0:
+                    switch (addr & 0x300L)
+                    {
+                        case 0: //control section
+                            if (size == 1){
                                 valid = true;
-                                msg = m_ioif.CreateReadResponse(m_devid, addr, 4);
-                                COMMIT {
-                                    SerializeRegister(RT_INTEGER, ev[index], msg->read_response.data.data, 4);
+                                unsigned char data = 0;
+                                switch (addr){
+                                    case 0: // Is the component enabled
+                                        data = m_enabled? m_devicetype : 0;
+                                        break;
+                                    case 1: // Events enabled?
+                                        data = m_events_enabled;
+                                        break;
+                                    case 2: // Interrupts enabled?
+                                        data = m_interrupt_enabled;
+                                        break;
+                                    case 3: // Interrupt channel
+                                        data = m_interruptChannel;
+                                        break;
+                                    case 4: // Event queue size limited to byte size
+                                        data = (m_eventqueue.size() > 255) ? 255 : m_eventqueue.size();
+                                        break;
+                                    default:
+                                        valid = false;
+                                }
+                                if (valid)
+                                {
+                                    msg = m_ioif.CreateReadResponse(m_devid, addr, 1);
+                                    COMMIT {
+                                        SerializeRegister(RT_INTEGER, data, msg->read_response.data.data, 1);
+                                    }
                                 }
                             }
-                        }
-                        break;
-                }
-                break;
-            case 1: //axes
-                if (size == 2 && addr % 2 == 0){
-                    int index = (addr & 0x3ffL) >> 1;
-                    if (index < m_joyinfo.naxes){
-                        valid = true;
-                        msg = m_ioif.CreateReadResponse(m_devid, addr, 2);
-                        COMMIT {
-                            SerializeRegister(RT_INTEGER, m_joystate.axes[index], msg->read_response.data.data, 2);
+                            break;
+                        case 0x100://info on latter sections
+                            if (size == 4 && (addr % 4) == 0 && m_enabled) {
+                                unsigned int data = 0;
+                                valid = true;
+                                int index = (addr & 0x7f) >> 2;
+                                switch (index)
+                                {
+                                    //Number of items
+                                    //Access width
+                                    //bits per entry
+                                    //entries per item
+                                    case 0: //axes
+                                        data = (m_joyinfo.naxes << 24) | (2 << 16) | (16 << 8) | 1;
+                                        break;
+                                    case 1://buttons
+                                        data = (m_joyinfo.nbuttons << 24) | (1 << 16) | (1 << 8) | 1;
+                                        break;
+                                    case 2://hats
+                                        data = (m_joyinfo.nhats << 24) | (1 << 16) | (8 << 8) | 1;
+                                        break;
+                                    case 3://balls
+                                        data = (m_joyinfo.nballs << 24) | (2 << 16) | (16 << 8) | 2;
+                                        break;
+                                    case 4://Make this accessible but read 0 to indicate no further sections
+                                        valid = true;
+                                        break;
+                                    default:
+                                        valid = false;
+                                }
+                                if (valid)
+                                {
+                                    msg = m_ioif.CreateReadResponse(m_devid, addr, 4);
+                                    COMMIT {
+                                        SerializeRegister(RT_INTEGER, data, msg->read_response.data.data, 4);
+                                    }
+                                }
+                            }
+                            break;
+                        default: //event access
+                            if (size == 4 && (addr % 4) == 0 && m_enabled && m_events_enabled)
+                            {
+                                int index = (addr & 0xff) >> 2;
+                                if (index < 6 && m_eventqueue.size() > 0)
+                                {
+                                    unsigned int *ev = (unsigned int *)(void *)&m_eventqueue.front();
+                                    valid = true;
+                                    msg = m_ioif.CreateReadResponse(m_devid, addr, 4);
+                                    COMMIT {
+                                        SerializeRegister(RT_INTEGER, ev[index], msg->read_response.data.data, 4);
+                                    }
+                                }
+                            }
+                            break;
+                    }
+                    break;
+                case 1: //axes
+                    if (size == 2 && addr % 2 == 0 && m_enabled){
+                        int index = (addr & 0x3ffL) >> 1;
+                        if (index < m_joyinfo.naxes){
+                            valid = true;
+                            msg = m_ioif.CreateReadResponse(m_devid, addr, 2);
+                            COMMIT {
+                                SerializeRegister(RT_INTEGER, m_joystate.axes[index], msg->read_response.data.data, 2);
+                            }
                         }
                     }
-                }
-                break;
-            case 2: //buttons
-                if (size == 1){
-                    int index = (addr & 0x3ffL);
-                    if (index < m_joyinfo.nbuttons){
-                        valid = true;
-                        msg = m_ioif.CreateReadResponse(m_devid, addr, 1);
-                        COMMIT {
-                            SerializeRegister(RT_INTEGER, m_joystate.buttons[index], msg->read_response.data.data, 1);
+                    break;
+                case 2: //buttons
+                    if (size == 1 && m_enabled){
+                        int index = (addr & 0x3ffL);
+                        if (index < m_joyinfo.nbuttons){
+                            valid = true;
+                            msg = m_ioif.CreateReadResponse(m_devid, addr, 1);
+                            COMMIT {
+                                SerializeRegister(RT_INTEGER, m_joystate.buttons[index], msg->read_response.data.data, 1);
+                            }
                         }
                     }
-                }
-                break;
-            case 3: //hats
-                if (size == 1){
-                    int index = (addr & 0x3ffL);
-                    if (index < m_joyinfo.nhats){
-                        valid = true;
-                        msg = m_ioif.CreateReadResponse(m_devid, addr, 1);
-                        COMMIT {
-                            SerializeRegister(RT_INTEGER, m_joystate.hats[index], msg->read_response.data.data, 1);
+                    break;
+                case 3: //hats
+                    if (size == 1 && m_enabled){
+                        int index = (addr & 0x3ffL);
+                        if (index < m_joyinfo.nhats){
+                            valid = true;
+                            msg = m_ioif.CreateReadResponse(m_devid, addr, 1);
+                            COMMIT {
+                                SerializeRegister(RT_INTEGER, m_joystate.hats[index], msg->read_response.data.data, 1);
+                            }
                         }
                     }
-                }
-                break;
-            case 4: //balls
-                if (size == 2 && addr % 2 == 0){
-                    int index = (addr & 0x3ffL) >> 1;
-                    if (index < (m_joyinfo.nballs * 2)){
-                        valid = true;
-                        msg = m_ioif.CreateReadResponse(m_devid, addr, 2);
-                        COMMIT {
-                            SerializeRegister(RT_INTEGER, m_joystate.balls[index], msg->read_response.data.data, 2);
+                    break;
+                case 4: //balls
+                    if (size == 2 && addr % 2 == 0 && m_enabled){
+                        int index = (addr & 0x3ffL) >> 1;
+                        if (index < (m_joyinfo.nballs * 2)){
+                            valid = true;
+                            msg = m_ioif.CreateReadResponse(m_devid, addr, 2);
+                            COMMIT {
+                                SerializeRegister(RT_INTEGER, m_joystate.balls[index], msg->read_response.data.data, 2);
+                            }
                         }
                     }
-                }
-                break;
+                    break;
+            }
         }
+
         if (!valid)
         {
             throw exceptf<>(*this, "Invalid read from device %u to %#016llx/%u", (unsigned)from, (unsigned long long)addr, (unsigned)size);
@@ -466,7 +465,7 @@ namespace Simulator
                 fprintf(m_replayfile,"\n");
             }
         }
-        sendresponse:
+
         if (!m_ioif.SendMessage(m_devid, from, msg))
         {
             DeadlockWrite("Cannot send input component read response to I/O bus");
@@ -481,7 +480,7 @@ namespace Simulator
         if (m_events_enabled)
         {
             m_eventqueue.push_back(event);
-            if (m_interrupt_enabled && !m_interrupt.IsSet())
+            if (m_interrupt_enabled)
                 m_interrupt.Set();
         }
         switch (event.common.type)

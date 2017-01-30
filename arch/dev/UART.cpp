@@ -464,8 +464,13 @@ namespace Simulator
             {
                 DebugIOWrite("Activating the UART");
                 COMMIT {
-                    if (m_sdljoyindex > -1)
-                        SDLInputManager::GetManager()->RegisterJoystickClient(*this, m_sdljoyindex);
+                    if (m_sdljoyindex > -1){
+                        if (SDLInputManager::GetManager()->RegisterJoystickClient(*this, m_sdljoyindex))
+                            m_enabled = true;
+                        else
+                            DebugIOWrite("Could not register for joystick with index %d", m_sdljoyindex);
+                        break;
+                    }
                     else
                         Selector::GetSelector().RegisterStream(m_fd_in, *this);
                     if (m_fd_in != m_fd_out)
@@ -631,7 +636,7 @@ namespace Simulator
     void UART::OnInputEvent(MGInputEvent event)
     {
         DebugIOWrite("Received Joystick Event");
-        //Actually let's queue enough bytes to capture every possible event for now and worry about optimisation later.
+        //Queue enough bytes (10) to capture every possible joystick event
         unsigned char *buff = (unsigned char *)(void *)&event;
         int i = 0;
         if (m_joystickqueue.empty() && !m_hwbuf_in_full)
@@ -653,7 +658,6 @@ namespace Simulator
 
         if (fd == m_fd_in && (state & Selector::READABLE))
         {
-            // fprintf(stderr, "External fd %d is readable\n", fd);
             //While the second condition seems redundant it handles a case where m_hwbuf_in_full is set to false
             //and m_receiveEnable is cleared by DoReceive() in the same cycle that a selector becomes readable
             //that lead to a full hardware buffer without m_receiveEnable being set, effectively stalling the UART

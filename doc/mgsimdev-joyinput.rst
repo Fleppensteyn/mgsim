@@ -19,7 +19,7 @@ DESCRIPTION
 ===========
 
 The joyinput device connects to joysticks, mouse and touch devices through
-The SDL library and can provide input events and immediate data on device
+the SDL library and can provide input events and immediate data on device
 state depending on the connected device.
 This device usually requires a functioning SDL window to receive events due
 to the way SDL works, therefore you probably have to use a gfx device to make
@@ -28,7 +28,7 @@ this work.
 An I/O device of this type can be specified in MGSim using the device
 type ``JoyInput``.
 
-Event structure is described in ``MGInputEvents.h``.
+Event structure is described in ``arch/dev/MGInputEvents.h``.
 
 CONFIGURATION
 =============
@@ -75,34 +75,37 @@ PROTOCOL
 ========
 
 The device can be controlled and accessed through the interface.
-The memory space is separated into several parts for controlling
+The address space is separated into several parts for controlling
 the device and information about the device itself, general information about
 the connected joystick/mouse, access to the events produced by the device, and
 access to the current state of the connected device.
 
 Controlling the device and interface info
 -----------------------------------------
-The first part of memory serves to control the device and is the only part of memory
-that can be written to.
+The first part of the address space provides information about the joyinput device
+and can control it. It is the only part that can be written to.
 
-This part can turn the device on, activate events, configure and enable notifications
+This part can turn the device on, activate events, configure and enable interrupts
 and pop the event queue. It can tell you what kind of device is connected through SDL,
-what the notification channel is and how many events are queued.
+what the interrupt channel is and how many events are queued.
 
-For enabling and disabling the device, events and notifications writing a nonzero value
-to their respective adresses will enable those respective functionalities while writing
-zero will disable them. Reading from these adresses will return either 0 for disabled
-or either the device type (for the adress that enables the device) or 1 to indicate if
+For enabling and disabling the device, events, and interrupts writing a nonzero value
+to their respective addresses will enable those respective functionalities while writing
+zero will disable them. Reading from these addresses will return either 0 for disabled
+or either the device type (for the address that enables the device) or 1 to indicate if
 any of the features are enabled.
 
-Values for device type can be found at the top of ``Joyinput.cpp``, but currently they
-are starting from 1 and numbered sequentially: Joystick, Mouse, Touch.
+Values for device type can be found in ``MGInputEvents.h``.
 
-The notification channel can be set by writing to the adress while reading from it
+The interrupt channel can be set by writing to the address while reading from it
 returns the current channel.
 
-The event queue can be popped by writing to the designated adress while reading from it will
+The event queue can be popped by writing to the designated address while reading from it will
 return the current queue length truncated to 255.
+
+Interrupts only function when events are enabled and they are used to indicate that there are
+events in the queue, so when an event is placed in the empty queue it sends the interrupt.
+The interrupt is cleared once the last event is popped of the queue.
 
 Getting information about the connected device
 ----------------------------------------------
@@ -117,17 +120,17 @@ All the information you need to access one of the four latter regions is availab
 single 4-byte read of which the bytes have individual meaning.
 There are currently four different 4-byte information values, one for each section.
 
-The 4 indivual bytes stand for the number of a certain kind of part, the access width
+The 4 individual bytes stand for the number of a certain kind of part, the access width
 used to access the region for this, the amount of bits that represent a single value,
 and the amount of items per value.
 
 ===== =====================
 Bits  Contain
 ===== =====================
-24-31 Amount of items
-16-23 Access width in bytes
-8-15  Bits per value
-0-7   Values per item
+25-32 Amount of items
+17-24 Access width in bytes
+9-16  Bits per value
+1-8   Values per item
 ===== =====================
 
 To make this more clear there is an example below.
@@ -145,7 +148,7 @@ with a single read from the interface.
 Hats have their state information in the 4 least significant bits of the byte read
 from the interface and the more significant bits are not used at this point in time.
 
-Balls are sligthly different from the other categories since they have to represent a
+Balls are slightly different from the other categories since they have to represent a
 relative value for both the x- and y-axis at the same time, so these are presented individually
 as 2 byte values with two entries per ball (x and y respectively).
 
@@ -186,13 +189,13 @@ regions contain. Keep in mind that any non 1 width memory accesses should be ali
 |       |    |   |     |              |       +-----+-----------------------------------------------+
 |       |    |   |     |              |       |  W  | 0 disables, non-zero enables events           |
 |       |    |   +-----+--------------+-------+-----+-----------------------------------------------+
-|       |    |   |   2 |            2 |   1   |  R  | 1 if notifications are enabled                |
+|       |    |   |   2 |            2 |   1   |  R  | 1 if interrupts are enabled                   |
 |       |    |   |     |              |       +-----+-----------------------------------------------+
-|       |    |   |     |              |       |  W  | 0 disables, non-zero enables notifications    |
+|       |    |   |     |              |       |  W  | 0 disables, non-zero enables interrupts       |
 |       |    |   +-----+--------------+-------+-----+-----------------------------------------------+
-|       |    |   |   3 |            3 |   1   |  R  | The current notification channel              |
+|       |    |   |   3 |            3 |   1   |  R  | The current interrupt channel                 |
 |       |    |   |     |              |       +-----+-----------------------------------------------+
-|       |    |   |     |              |       |  W  | Set the notification channel                  |
+|       |    |   |     |              |       |  W  | Set the interrupt channel                     |
 |       |    |   +-----+--------------+-------+-----+-----------------------------------------------+
 |       |    |   |   4 |            4 |   1   |  R  | The amount of queued events (up to 255)       |
 |       |    |   |     |              |       +-----+-----------------------------------------------+
@@ -204,7 +207,9 @@ regions contain. Keep in mind that any non 1 width memory accesses should be ali
 |       |    |   +-----+--------------+-------+-----+-----------------------------------------------+
 |       |    |   |   8 |          108 |   4   |  R  | Information on the hats section               |
 |       |    |   +-----+--------------+-------+-----+-----------------------------------------------+
-|       |    |   |  12 |          10C |   4   |  R  | Information on the balls section              |
+|       |    |   |  12 |          10C |   4   |  R  | Information on the hats section               |
+|       |    |   +-----+--------------+-------+-----+-----------------------------------------------+
+|       |    |   |  16 |          110 |   4   |  R  | Reads 0 to indicate no further sections       |
 |       +----+---+-----+--------------+-------+-----+-----------------------------------------------+
 |       |  1 | 0,4..16 |      200-210 |   4   |  R  | Read from the event in 4-byte chunks          |
 +-------+----+---------+--------------+-------+-----+-----------------------------------------------+

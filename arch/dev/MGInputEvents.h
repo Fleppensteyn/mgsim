@@ -2,6 +2,14 @@
 #ifndef MGINPUTEVENTS_H
 #define MGINPUTEVENTS_H
 
+//These device types can be used to determine what events to expect
+enum devicetypes
+{
+    MG_JOYSTICK = 1,
+    MG_MOUSE,
+    MG_TOUCH
+};
+
 enum eventtypes
 {
     MG_JOYAXISMOTION = 0x01,
@@ -48,7 +56,7 @@ typedef struct MGJoyInputEvent
 // MGMouseInputEvent
 // timestamp - The timestamp from the SDL event
 // type      - A value from eventtypes above
-// num       - For MOUSEBUTTON event this is the button number using the values below (e.g. 3 = BUTTON_RIGHT)
+// num       - For MOUSEBUTTON event this is the button number using the values below (e.g. 2 = BUTTON_RIGHT)
 // state     - MOUSEBUTTON: The state of the button 0 = Released, 1 = Pressed.
 //             MOUSEMOTION: this contains the state of the mouse buttons accessible through bitmasks.
 //               The order is the same as the values below and they start at the least significant bit.
@@ -73,12 +81,12 @@ typedef struct MGMouseInputEvent
 } MGMouseInputEvent;
 
 // Numbering to identify mousebuttons. Use buttonmask to generate a mask for a certain button
-#define MG_BUTTON_LEFT      1
-#define MG_BUTTON_MIDDLE    2
-#define MG_BUTTON_RIGHT     3
-#define MG_BUTTON_X1        4
-#define MG_BUTTON_X2        5
-#define MG_BUTTONMASK(X)    (1 << ((X)-1))
+#define MG_BUTTON_LEFT      0
+#define MG_BUTTON_MIDDLE    1
+#define MG_BUTTON_RIGHT     2
+#define MG_BUTTON_X1        3
+#define MG_BUTTON_X2        4
+#define MG_BUTTONMASK(X)    (1 << (X))
 
 
 // MGTouchInputEvent

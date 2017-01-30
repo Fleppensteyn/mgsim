@@ -58,13 +58,15 @@ namespace Simulator
         // for a window.
         void GetMaxWindowSize(unsigned& w, unsigned& h);
 
-        // OnCycle(): only call CheckEvents (which is expensive) every
-        // m_refreshDelay cycles.  Called by Kernel::Step().
+        // OnCycle(): calls CheckEvents regularly based on the defined
+        // cycle counts. Events are processed every m_inputPollDelay cycles
+        // and display refreshing, which also checks events, is on its own
+        // delay called m_refreshDelay because it is more expensive.
+        // This is called by Kernel::Step().
         void OnCycle(CycleNo cycle)
         {
             if (m_lastUpdate + m_refreshDelay > cycle)
             {
-                // return;
                 if (m_lastInputPoll + m_inputPollDelay <= cycle){
                     m_lastInputPoll = cycle;
                     CheckEvents(false);

@@ -277,7 +277,7 @@ namespace Simulator
             case SDL_MOUSEBUTTONUP:
             case SDL_MOUSEBUTTONDOWN:
                 mgev.mouse.type = MG_MOUSEBUTTON;
-                mgev.mouse.num = event->button.button;
+                mgev.mouse.num = event->button.button - 1;//correct SDLs offset
                 mgev.mouse.state = (event->button.state == SDL_PRESSED)?1:0;
                 mgev.mouse.clicks = event->button.clicks;
                 mgev.mouse.xpos = (short)event->button.x;
