@@ -340,7 +340,7 @@ namespace Simulator
                                 {
                                     msg = m_ioif.CreateReadResponse(m_devid, addr, 1);
                                     COMMIT {
-                                        SerializeRegister(RT_INTEGER, data, msg->read_response.data.data, 1);
+                                        msg->read_response.data.data[0] = data;
                                     }
                                 }
                             }
@@ -419,7 +419,7 @@ namespace Simulator
                             valid = true;
                             msg = m_ioif.CreateReadResponse(m_devid, addr, 1);
                             COMMIT {
-                                SerializeRegister(RT_INTEGER, m_joystate.buttons[index], msg->read_response.data.data, 1);
+                                msg->read_response.data.data[0] = m_joystate.buttons[index];
                             }
                         }
                     }
@@ -431,7 +431,7 @@ namespace Simulator
                             valid = true;
                             msg = m_ioif.CreateReadResponse(m_devid, addr, 1);
                             COMMIT {
-                                SerializeRegister(RT_INTEGER, m_joystate.hats[index], msg->read_response.data.data, 1);
+                                msg->read_response.data.data[0] = m_joystate.hats[index];
                             }
                         }
                     }
